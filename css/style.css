@@ -3,7 +3,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 body {
@@ -21,66 +21,121 @@ body {
     border-radius: 2rem;
     box-shadow: 0 20px 40px -12px rgba(0,0,0,0.08);
     padding: 2rem 2rem 3rem;
-    transition: all 0.2s;
 }
 
-/* ===== TABS ===== */
-.tabs {
+/* ===== HEADER ===== */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #e9edf2;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-left h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #0b1b33;
+}
+
+.header-right {
     display: flex;
     gap: 0.5rem;
-    border-bottom: 1px solid #e9edf2;
-    padding-bottom: 1rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
 }
 
-.tab-btn {
-    background: transparent;
-    border: none;
-    padding: 0.6rem 1.4rem;
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: #4b5563;
-    border-radius: 40px;
-    cursor: pointer;
-    transition: 0.2s;
+/* ===== LOGIN PAGE ===== */
+.login-container {
     display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 90vh;
+    width: 100%;
+    background: #f8fafc;
+}
+
+.login-card {
+    background: white;
+    border-radius: 2rem;
+    padding: 3rem 2.5rem;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.1);
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+}
+
+.login-header {
+    margin-bottom: 2.5rem;
+}
+
+.login-header h1 {
+    font-size: 2rem;
+    color: #0b1b33;
+    margin: 0.5rem 0 0.3rem;
+}
+
+.login-header p {
+    color: #64748b;
+}
+
+.role-selection {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.role-card {
+    background: #f8fafc;
+    border: 2px solid #e9edf2;
+    border-radius: 1.5rem;
+    padding: 2rem 1rem;
+    text-decoration: none;
+    color: #0b1b33;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
 }
 
-.tab-btn i {
-    font-size: 1rem;
-    color: #6b7280;
-}
-
-.tab-btn.active {
+.role-card:hover {
+    border-color: #0f172a;
     background: #f1f5f9;
-    color: #0f172a;
-    font-weight: 600;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px -10px rgba(0,0,0,0.05);
 }
 
-.tab-btn.active i {
-    color: #0f172a;
+.role-card.admin-role:hover {
+    border-color: #0f172a;
 }
 
-.tab-btn:hover {
-    background: #f1f5f9;
+.role-card.customer-role:hover {
+    border-color: #0f172a;
 }
 
-/* ===== PANELS ===== */
-.panel {
-    display: none;
-    animation: fade 0.2s ease;
+.role-card h2 {
+    font-size: 1.1rem;
+    margin: 0.3rem 0 0;
 }
 
-.panel.active {
-    display: block;
+.role-card p {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0;
 }
 
-@keyframes fade {
-    0% { opacity: 0.5; }
-    100% { opacity: 1; }
+.login-footer {
+    margin-top: 2rem;
+    color: #94a3b8;
 }
 
 /* ===== CARDS ===== */
@@ -105,7 +160,14 @@ body {
     font-weight: 600;
     font-size: 1.2rem;
     color: #0b1b33;
-    letter-spacing: -0.01em;
+}
+
+.card-actions {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .badge {
@@ -121,7 +183,6 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 1.2rem 1.5rem;
-    margin: 0.5rem 0;
 }
 
 .settings-item {
@@ -134,8 +195,8 @@ body {
     font-size: 0.8rem;
     font-weight: 500;
     color: #475569;
-    letter-spacing: 0.02em;
     text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 .settings-item input {
@@ -153,6 +214,34 @@ body {
     box-shadow: 0 0 0 3px rgba(0,0,0,0.02);
 }
 
+/* ===== STATS ===== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.stat-item {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 1rem;
+    text-align: center;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 0.3rem;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #0b1b33;
+}
+
 /* ===== BUTTONS ===== */
 .btn {
     background: #f1f5f9;
@@ -168,6 +257,7 @@ body {
     gap: 0.5rem;
     font-size: 0.9rem;
     border: 1px solid transparent;
+    text-decoration: none;
 }
 
 .btn-primary {
@@ -193,7 +283,7 @@ body {
     font-size: 0.8rem;
 }
 
-/* ===== CUSTOMER LIST ===== */
+/* ===== CUSTOMER DIAMOND GRID ===== */
 .list-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -206,7 +296,6 @@ body {
 .bulk-actions {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
     gap: 0.6rem;
 }
 
@@ -215,14 +304,9 @@ body {
     border: 1px solid #dce1e9;
 }
 
-.bulk-actions .btn i {
-    color: #4b5563;
-}
-
-/* ===== DIAMOND GRID ===== */
 .diamond-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 1.5rem;
 }
 
@@ -230,7 +314,7 @@ body {
     background: white;
     border-radius: 1.2rem;
     border: 1px solid #edf2f7;
-    padding: 1rem 0.8rem 1rem;
+    padding: 1rem 0.8rem;
     transition: 0.1s ease;
     text-align: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.01);
@@ -331,21 +415,19 @@ body {
     cursor: pointer;
 }
 
-/* ===== UTILITY ===== */
-.flex-between {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.mt-2 { margin-top: 0.5rem; }
-.mb-1 { margin-bottom: 0.5rem; }
-.gap-1 { gap: 0.5rem; }
-
 /* ===== RESPONSIVE ===== */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .app { padding: 1rem; }
+    .role-selection { grid-template-columns: 1fr; }
     .diamond-grid { grid-template-columns: repeat(2, 1fr); }
     .settings-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .header { flex-direction: column; align-items: flex-start; }
+    .header-right { width: 100%; }
+}
+
+@media (max-width: 480px) {
+    .diamond-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr; }
+    .login-card { padding: 1.5rem; }
 }
