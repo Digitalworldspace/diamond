@@ -3,120 +3,37 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Diamond Portal · Admin & Customer</title>
-    
-    <!-- Styles -->
+    <title>Diamond Portal - Login</title>
     <link rel="stylesheet" href="css/style.css" />
-    
-    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-    
-    <!-- Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <div class="app" id="app">
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="admin">
-                <i class="fas fa-user-cog"></i> Admin
-            </button>
-            <button class="tab-btn" data-tab="customer">
-                <i class="fas fa-user"></i> Customer
-            </button>
-        </div>
-
-        <!-- ========== ADMIN PANEL ========== -->
-        <div id="panel-admin" class="panel active">
-            <div class="card">
-                <div class="card-header">
-                    <h3><i class="fas fa-building" style="margin-right:0.5rem;"></i> Company Settings</h3>
-                    <span class="badge"><i class="far fa-save"></i> Auto-saved</span>
-                </div>
-                <div class="settings-grid" id="companySettings">
-                    <div class="settings-item">
-                        <label>Company Name</label>
-                        <input type="text" id="compName" value="Luminary Diamonds" />
-                    </div>
-                    <div class="settings-item">
-                        <label>VAT / Tax ID</label>
-                        <input type="text" id="compTax" value="BE 0123.456.789" />
-                    </div>
-                    <div class="settings-item">
-                        <label>Country</label>
-                        <input type="text" id="compCountry" value="Belgium" />
-                    </div>
-                    <div class="settings-item">
-                        <label>Contact Email</label>
-                        <input type="email" id="compEmail" value="info@luminary.be" />
-                    </div>
-                    <div class="settings-item">
-                        <label>Phone</label>
-                        <input type="text" id="compPhone" value="+32 499 12 34 56" />
-                    </div>
-                    <div class="settings-item">
-                        <label>Address</label>
-                        <input type="text" id="compAddress" value="Antwerp, Hoveniersstraat 22" />
-                    </div>
-                </div>
-                <div style="display: flex; gap: 0.8rem; margin-top: 0.8rem;">
-                    <button class="btn btn-primary btn-sm" id="saveCompanyBtn">
-                        <i class="fas fa-check"></i> Update Company
-                    </button>
-                    <button class="btn btn-outline btn-sm" id="resetCompanyBtn">
-                        <i class="fas fa-undo-alt"></i> Reset
-                    </button>
-                </div>
-                <div style="margin-top: 1rem; font-size:0.9rem; color: #2d4b6e;" id="companyFeedback">
-                    <i class="fas fa-info-circle"></i> All fields are editable.
-                </div>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fas fa-gem" style="font-size: 3rem; color: #0f172a;"></i>
+                <h1>Diamond Portal</h1>
+                <p>Select your role to continue</p>
             </div>
-        </div>
-
-        <!-- ========== CUSTOMER PANEL ========== -->
-        <div id="panel-customer" class="panel">
-            <div class="card">
-                <div class="list-toolbar">
-                    <div>
-                        <span style="font-weight: 500; font-size:1rem;">
-                            <i class="fas fa-gem" style="margin-right:0.4rem;"></i>Diamond Inventory
-                        </span>
-                        <span class="badge" style="margin-left:0.8rem;" id="selectedCounter">0 selected</span>
-                    </div>
-                    <div class="bulk-actions">
-                        <button class="btn btn-sm" id="selectAllBtn">
-                            <i class="far fa-square"></i> All
-                        </button>
-                        <button class="btn btn-sm" id="deselectAllBtn">
-                            <i class="far fa-square"></i> None
-                        </button>
-                        <button class="btn btn-sm btn-primary" id="bulkConfirmBtn">
-                            <i class="fas fa-check-circle"></i> Confirm
-                        </button>
-                        <button class="btn btn-sm" id="bulkHoldBtn">
-                            <i class="fas fa-pause-circle"></i> Hold
-                        </button>
-                        <button class="btn btn-sm" id="bulkReleaseBtn">
-                            <i class="fas fa-undo-alt"></i> Release
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Diamond Grid -->
-                <div class="diamond-grid" id="diamondGrid">
-                    <!-- Cards injected by JS -->
-                </div>
-                <div style="margin-top:1.2rem; font-size:0.85rem; color: #475569;">
-                    <i class="fas fa-arrow-pointer"></i> Select stones, then use bulk actions.
-                </div>
+            
+            <div class="role-selection">
+                <a href="admin.html" class="role-card admin-role">
+                    <i class="fas fa-user-cog" style="font-size: 2.5rem;"></i>
+                    <h2>Admin Panel</h2>
+                    <p>Manage company settings</p>
+                </a>
+                
+                <a href="customer.html" class="role-card customer-role">
+                    <i class="fas fa-user" style="font-size: 2.5rem;"></i>
+                    <h2>Customer Panel</h2>
+                    <p>View and manage diamonds</p>
+                </a>
+            </div>
+            
+            <div class="login-footer">
+                <small>Simple &amp; Sober Design</small>
             </div>
         </div>
     </div>
-
-    <!-- JavaScript Files -->
-    <script src="js/supabase-config.js"></script>
-    <script src="js/admin.js"></script>
-    <script src="js/customer.js"></script>
-    <script src="js/app.js"></script>
 </body>
 </html>
