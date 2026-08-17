@@ -1,8 +1,7 @@
 // ============================================
-// CUSTOMER PANEL - Diamond Inventory
+// CUSTOMER PANEL
 // ============================================
 
-// Local diamond data (fallback)
 let diamonds = [
     { id: 'd1', name: 'Radiant 1.2ct', shape: 'Round', status: 'available', image: '' },
     { id: 'd2', name: 'Cushion 2.0ct', shape: 'Cushion', status: 'confirmed', image: '' },
@@ -15,21 +14,16 @@ let diamonds = [
 ];
 
 // ===== HELPERS =====
-function getDiamondImage(id) {
-    const seed = id.charCodeAt(1) || 5;
-    return `https://picsum.photos/seed/${id}${seed}/200/200`;
-}
-
 function updateSelectedCounter() {
     const count = diamonds.filter(d => d._checked === true).length;
-    document.getElementById('selectedCounter').innerText = `${count} selected`;
+    document.getElementById('selectedCounter').textContent = `${count} selected`;
 }
 
 function getSelectedIds() {
     return diamonds.filter(d => d._checked === true).map(d => d.id);
 }
 
-// ===== RENDER DIAMONDS =====
+// ===== RENDER =====
 function renderDiamonds() {
     const grid = document.getElementById('diamondGrid');
     if (!grid) return;
@@ -47,9 +41,8 @@ function renderDiamonds() {
     let html = '';
     diamonds.forEach((d) => {
         const imgSrc = d.image || getDiamondImage(d.id);
-        const statusClass = d.status === 'confirmed' ? 'status-confirmed' : 
-                           (d.status === 'hold' ? 'status-hold' : '');
-        const statusLabel = d.status.charAt(0).toUpperCase() + d.status.slice(1);
+        const statusClass = getStatusClass(d.status);
+        const statusLabel = formatStatus(d.status);
         const checked = d._checked ? 'checked' : '';
 
         html += `
@@ -80,45 +73,33 @@ function renderDiamonds() {
     });
     grid.innerHTML = html;
     updateSelectedCounter();
-    attachDiamondEvents();
+    attachEvents();
 }
 
-// ===== ATTACH EVENTS =====
-function attachDiamondEvents() {
-    // Single action buttons
+function attachEvents() {
+    // Single actions
     document.querySelectorAll('.action-confirm').forEach(btn => {
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            updateDiamondStatus(btn.dataset.id, 'confirmed');
-        };
+        btn.onclick = () => updateStatus(btn.dataset.id, 'confirmed');
     });
-    
     document.querySelectorAll('.action-hold').forEach(btn => {
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            updateDiamondStatus(btn.dataset.id, 'hold');
-        };
+        btn.onclick = () => updateStatus(btn.dataset.id, 'hold');
     });
-    
     document.querySelectorAll('.action-release').forEach(btn => {
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            updateDiamondStatus(btn.dataset.id, 'available');
-        };
+        btn.onclick = () => updateStatus(btn.dataset.id, 'available');
     });
 
-    // Checkbox change
+    // Checkboxes
     document.querySelectorAll('.diamond-select').forEach(cb => {
-        cb.onchange = (e) => {
-            const diamond = diamonds.find(d => d.id === cb.dataset.id);
-            if (diamond) diamond._checked = cb.checked;
+        cb.onchange = () => {
+            const d = diamonds.find(d => d.id === cb.dataset.id);
+            if (d) d._checked = cb.checked;
             updateSelectedCounter();
         };
     });
 }
 
-// ===== UPDATE DIAMOND STATUS =====
-function updateDiamondStatus(id, newStatus) {
+// ===== STATUS OPERATIONS =====
+function updateStatus(id, newStatus) {
     const diamond = diamonds.find(d => d.id === id);
     if (!diamond) return;
     
@@ -126,19 +107,17 @@ function updateDiamondStatus(id, newStatus) {
     diamond._checked = diamond._checked || false;
     renderDiamonds();
     
-    // Sync with Supabase
     if (window.SUPABASE && window.SUPABASE.enabled) {
         window.SUPABASE.client
             .from('diamonds')
-            .update({ status: newStatus })
+            .update({ status: newStatus, updated_at: new Date().toISOString() })
             .eq('id', id)
             .then(({ error }) => {
-                if (error) console.warn('Supabase update error:', error);
+                if (error) console.warn('Update error:', error);
             });
     }
 }
 
-// ===== BULK ACTIONS =====
 function bulkAction(action) {
     const ids = getSelectedIds();
     if (ids.length === 0) {
@@ -158,14 +137,13 @@ function bulkAction(action) {
     
     renderDiamonds();
     
-    // Bulk update in Supabase
     if (window.SUPABASE && window.SUPABASE.enabled && ids.length > 0) {
         window.SUPABASE.client
             .from('diamonds')
-            .update({ status: newStatus })
+            .update({ status: newStatus, updated_at: new Date().toISOString() })
             .in('id', ids)
             .then(({ error }) => {
-                if (error) console.warn('Supabase bulk update error:', error);
+                if (error) console.warn('Bulk update error:', error);
             });
     }
 }
@@ -175,7 +153,7 @@ function setAllCheckboxes(checked) {
     renderDiamonds();
 }
 
-// ===== LOAD DIAMONDS FROM SUPABASE =====
+// ===== LOAD FROM SUPABASE =====
 async function loadDiamondsFromSupabase() {
     if (!window.SUPABASE || !window.SUPABASE.enabled) return;
     
@@ -193,19 +171,16 @@ async function loadDiamondsFromSupabase() {
     }
 }
 
-// ===== INIT CUSTOMER =====
+// ===== INIT =====
 function initCustomer() {
-    // Load from Supabase or use local data
     if (window.SUPABASE && window.SUPABASE.enabled) {
         loadDiamondsFromSupabase().then(() => {
-            // If no data from Supabase, render local
             if (diamonds.length === 0) renderDiamonds();
         });
     } else {
         renderDiamonds();
     }
     
-    // Event listeners for bulk actions
     document.getElementById('selectAllBtn').addEventListener('click', () => setAllCheckboxes(true));
     document.getElementById('deselectAllBtn').addEventListener('click', () => setAllCheckboxes(false));
     document.getElementById('bulkConfirmBtn').addEventListener('click', () => bulkAction('confirm'));
@@ -213,7 +188,6 @@ function initCustomer() {
     document.getElementById('bulkReleaseBtn').addEventListener('click', () => bulkAction('release'));
 }
 
-// Initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCustomer);
 } else {
