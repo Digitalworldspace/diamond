@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Panel - Diamond Portal</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="app admin-app">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <i class="fas fa-gem" style="font-size: 1.5rem; color: #0f172a;"></i>
+                <h1>Admin Panel</h1>
+                <span class="badge">Company Settings</span>
+            </div>
+            <div class="header-right">
+                <a href="index.html" class="btn btn-outline btn-sm">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+                <a href="customer.html" class="btn btn-sm">
+                    <i class="fas fa-user"></i> Customer View
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-building" style="margin-right:0.5rem;"></i> Company Information</h3>
+                <span class="badge"><i class="far fa-save"></i> Auto-saved</span>
+            </div>
+            
+            <div class="settings-grid" id="companySettings">
+                <div class="settings-item">
+                    <label>Company Name</label>
+                    <input type="text" id="compName" value="Luminary Diamonds" />
+                </div>
+                <div class="settings-item">
+                    <label>VAT / Tax ID</label>
+                    <input type="text" id="compTax" value="BE 0123.456.789" />
+                </div>
+                <div class="settings-item">
+                    <label>Country</label>
+                    <input type="text" id="compCountry" value="Belgium" />
+                </div>
+                <div class="settings-item">
+                    <label>Contact Email</label>
+                    <input type="email" id="compEmail" value="info@luminary.be" />
+                </div>
+                <div class="settings-item">
+                    <label>Phone</label>
+                    <input type="text" id="compPhone" value="+32 499 12 34 56" />
+                </div>
+                <div class="settings-item">
+                    <label>Address</label>
+                    <input type="text" id="compAddress" value="Antwerp, Hoveniersstraat 22" />
+                </div>
+            </div>
+            
+            <div class="card-actions">
+                <button class="btn btn-primary" id="saveCompanyBtn">
+                    <i class="fas fa-check"></i> Update Company
+                </button>
+                <button class="btn btn-outline" id="resetCompanyBtn">
+                    <i class="fas fa-undo-alt"></i> Reset
+                </button>
+                <span id="companyFeedback" style="margin-left: 1rem; font-size:0.9rem; color: #2d4b6e;">
+                    <i class="fas fa-info-circle"></i> All fields are editable
+                </span>
+            </div>
+        </div>
+
+        <!-- Statistics Card -->
+        <div class="card stats-card">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-bar" style="margin-right:0.5rem;"></i> Dashboard Stats</h3>
+            </div>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-item">
+                    <span class="stat-label">Total Diamonds</span>
+                    <span class="stat-value" id="totalDiamonds">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Available</span>
+                    <span class="stat-value" id="availableDiamonds">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">On Hold</span>
+                    <span class="stat-value" id="holdDiamonds">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Confirmed</span>
+                    <span class="stat-value" id="confirmedDiamonds">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
