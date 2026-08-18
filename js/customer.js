@@ -17,7 +17,7 @@ const ACTION_LABELS = {
 };
 
 (async function init() {
-  myProfile = await requireRole("customer");
+  myProfile = requireRole("customer");
   if (!myProfile) return;
 
   document.getElementById("custName").textContent = myProfile.full_name || "Customer";
