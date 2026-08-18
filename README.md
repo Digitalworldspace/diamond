@@ -2,15 +2,26 @@
 
 A simple, sober white-themed portal for a diamond business, with two panels:
 
-- **Admin panel** — dashboard, stone inventory, customer requests, and a
-  **Settings** page to edit every piece of company information.
+- **Admin panel** — dashboard, stone inventory, customer requests, a
+  **Users** page to create/edit logins, and a **Settings** page to edit
+  every piece of company information.
 - **Customer panel** — a stone list with larger images, quick per-stone
   actions (Hold / Confirm), and **bulk actions** (select multiple stones and
   send one request: Hold, Confirm, Request video, Request memo, Request
   certificate).
 
 It's plain HTML/CSS/JS — no build step — so it can be hosted directly on
-GitHub Pages, and it uses **Supabase** for authentication and the database.
+GitHub Pages, and it uses **Supabase** as the database.
+
+Login is simple on purpose: no Supabase Auth. Usernames and passwords live
+in a plain `users` table that you can edit directly in Supabase's **Table
+Editor**, or through the **Users** tab inside the admin panel.
+
+> **Security note:** because there's no auth layer, anyone with your
+> project's public API key can read and write these tables directly (the
+> key is visible in your page's source once deployed). That's fine for an
+> internal tool used only by people you trust, but don't reuse these
+> passwords anywhere else, and don't put highly sensitive data in it.
 
 ---
 
@@ -31,16 +42,20 @@ const SUPABASE_ANON_KEY = "eyJhbGciOi...";
 
 ## 2. Database schema (SQL)
 
-Paste this whole block into the Supabase **SQL Editor** and run it.
+Paste this whole block into the Supabase **SQL Editor** and run it. It
+creates the tables and adds one starter admin login (`admin` /
+`admin123` — **change this password right after your first login**, from
+the **Users** tab in the admin panel).
 
 ```sql
--- ============ PROFILES (links auth users to a role) ============
-create table profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  email text,
+-- ============ USERS (plain login table — edit directly in Table Editor) ============
+create table users (
+  id uuid primary key default gen_random_uuid(),
+  username text not null unique,
+  password text not null,
   full_name text,
+  email text,
   role text not null check (role in ('admin', 'customer')),
-  company_name text,
   created_at timestamptz default now()
 );
 
@@ -90,7 +105,7 @@ create table stones (
 create table stone_requests (
   id uuid primary key default gen_random_uuid(),
   stone_id uuid references stones(id) on delete cascade,
-  customer_id uuid references profiles(id) on delete cascade,
+  customer_id uuid references users(id) on delete cascade,
   customer_name text,
   customer_email text,
   action_type text not null
@@ -101,83 +116,47 @@ create table stone_requests (
   created_at timestamptz default now()
 );
 
--- ============ Helper: is the current user an admin? ============
-create or replace function is_admin()
-returns boolean
-language sql
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from profiles where id = auth.uid() and role = 'admin'
-  );
-$$;
-
--- ============ Row Level Security ============
-alter table profiles enable row level security;
-alter table company_settings enable row level security;
-alter table stones enable row level security;
-alter table stone_requests enable row level security;
-
--- profiles: a user can read their own row; admins can read all
-create policy "read own profile" on profiles for select using (auth.uid() = id or is_admin());
-create policy "admin updates profiles" on profiles for update using (is_admin());
-create policy "admin inserts profiles" on profiles for insert with check (is_admin());
-
--- company_settings: any signed-in user can read; only admins can write
-create policy "read company settings" on company_settings for select using (auth.role() = 'authenticated');
-create policy "admin writes company settings" on company_settings for insert with check (is_admin());
-create policy "admin updates company settings" on company_settings for update using (is_admin());
-
--- stones: any signed-in user can read; only admins can write
-create policy "read stones" on stones for select using (auth.role() = 'authenticated');
-create policy "admin inserts stones" on stones for insert with check (is_admin());
-create policy "admin updates stones" on stones for update using (is_admin());
-create policy "admin deletes stones" on stones for delete using (is_admin());
-
--- stone_requests: customers see + create their own; admins see + update all
-create policy "customer reads own requests" on stone_requests for select using (customer_id = auth.uid() or is_admin());
-create policy "customer creates own requests" on stone_requests for insert with check (customer_id = auth.uid() or is_admin());
-create policy "admin updates requests" on stone_requests for update using (is_admin());
-
 -- seed the single company_settings row so the admin Settings page has something to update
 insert into company_settings (id) values ('00000000-0000-0000-0000-000000000001');
+
+-- seed a starter admin login — change the password after your first sign-in
+insert into users (username, password, full_name, email, role)
+values ('admin', 'admin123', 'Admin', 'admin@yourcompany.com', 'admin');
 ```
+
+That's it — no Row Level Security setup needed, since there's no auth
+session to check against. All four tables are readable/writable using the
+anon key, which is what lets the plain login and Table Editor approach
+work.
 
 ---
 
-## 3. Create your first admin user
+## 3. Sign in
 
-1. In Supabase, go to **Authentication → Users → Add user**, create an
-   account with an email and password (turn off "auto confirm" only if you
-   want to send a real confirmation email — for testing, leave auto-confirm
-   on).
-2. Copy the new user's **UID**.
-3. In **SQL Editor**, run:
+Go to `index.html`, sign in with `admin` / `admin123`, then:
 
-```sql
-insert into profiles (id, email, full_name, role)
-values ('paste-the-uid-here', 'admin@yourcompany.com', 'Your Name', 'admin');
-```
+- Open the **Users** tab and change the admin password (or add a new admin
+  and delete the starter one).
+- Add a login for each customer: **Users → Add user**, pick role
+  `Customer`, give them a username and password. They sign in at the same
+  `index.html` page.
 
-4. Repeat for each **customer**, using `'customer'` as the role instead.
-   Customers sign in with the email/password you set for them — there's no
-   public sign-up form, since access is meant to be granted by the admin.
+You can also manage the `users` table straight from Supabase's **Table
+Editor** if you prefer — it's the same data either way.
 
 ---
 
 ## 4. Add your stones
 
-Sign in to `admin.html` with your admin account → **Inventory** → **Add
-stone**. Paste an image URL for each stone (you can host images anywhere —
-Supabase Storage, Imgur, your own site, etc.).
+Admin → **Inventory** → **Add stone**. Paste an image URL for each stone
+(host images anywhere — Supabase Storage, Imgur, your own site, etc.).
 
 ---
 
 ## 5. Fill in company information
 
-Sign in as admin → **Settings** → fill in company name, address, GST/PAN,
-bank details, terms, etc. → **Save changes**. This is the single source of
+Admin → **Settings** → fill in company name, address, GST/PAN, bank
+details, terms, etc. → **Save changes**. This is the single source of
 truth for your company's information across the portal.
 
 ---
@@ -208,8 +187,7 @@ truth for your company's information across the portal.
    — that's your live portal. Share `…/index.html` (or just the base URL)
    with your admins and customers.
 
-That's it — no server, no build step. Supabase handles authentication and
-the database directly from the browser.
+That's it — no server, no build step.
 
 ---
 
@@ -217,21 +195,13 @@ the database directly from the browser.
 
 ```
 diamond-portal/
-├── index.html          # login page (admin + customer)
-├── admin.html           # admin panel (dashboard, inventory, requests, settings)
+├── index.html          # login page (checks the `users` table directly)
+├── admin.html           # admin panel (dashboard, inventory, requests, users, settings)
 ├── customer.html         # customer panel (stone list, bulk actions, my requests)
 ├── css/style.css         # shared white/sober theme
 ├── js/supabase-client.js # your Supabase URL + anon key go here
-├── js/auth.js            # shared login/session helpers
+├── js/auth.js            # login/session helpers (localStorage-based)
 ├── js/admin.js           # admin panel logic
 ├── js/customer.js        # customer panel logic
 └── README.md
 ```
-
-## Notes on security
-
-The anon key is public by design — Supabase's Row Level Security (RLS)
-policies above are what actually protect your data (customers can only see
-their own requests, only admins can write to inventory/settings, etc.).
-Before going live with real customer data, review the RLS policies against
-your own business rules.
