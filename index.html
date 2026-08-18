@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Diamond Portal — Sign In</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-brand">
+      <svg class="diamond-mark" viewBox="0 0 24 24"><path d="M4 9 L12 3 L20 9 L12 21 Z M4 9 L20 9 M9 9 L12 3 L15 9 M9 9 L12 21 M15 9 L12 21"/></svg>
+      <h1>Diamond Portal</h1>
+      <p>Sign in to continue</p>
+    </div>
+
+    <div class="login-error" id="loginError"></div>
+
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" required autocomplete="username" placeholder="you@company.com" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" required autocomplete="current-password" placeholder="••••••••" />
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; padding:11px;" id="loginBtn">Sign in</button>
+    </form>
+
+    <p class="login-hint">Access is provided by your company administrator. Contact them if you don't have an account.</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+<script>
+  // If already signed in, jump straight to the right panel.
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      const profile = await getProfile(session.user.id);
+      if (profile?.role === "admin") window.location.href = "admin.html";
+      else if (profile?.role === "customer") window.location.href = "customer.html";
+    }
+  })();
+
+  const form = document.getElementById("loginForm");
+  const errorBox = document.getElementById("loginError");
+  const btn = document.getElementById("loginBtn");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox.classList.remove("show");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Signing in…';
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      errorBox.textContent = error.message;
+      errorBox.classList.add("show");
+      btn.disabled = false;
+      btn.textContent = "Sign in";
+      return;
+    }
+
+    const profile = await getProfile(data.user.id);
+    if (!profile) {
+      errorBox.textContent = "No profile found for this account. Ask your admin to set one up.";
+      errorBox.classList.add("show");
+      await sb.auth.signOut();
+      btn.disabled = false;
+      btn.textContent = "Sign in";
+      return;
+    }
+
+    window.location.href = profile.role === "admin" ? "admin.html" : "customer.html";
+  });
+</script>
+</body>
+</html>
