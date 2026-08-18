@@ -1,35 +1,38 @@
 /* =========================================================
-   Shared auth + small UI helpers used on every page
+   Simple table-based "login" — no Supabase Auth.
+   A signed-in user is just a row from the `users` table,
+   kept in localStorage for the length of the browser session.
    ========================================================= */
 
-async function getProfile(userId) {
-  const { data, error } = await sb
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single();
-  if (error) return null;
-  return data;
+const SESSION_KEY = "dp_user";
+
+function getSession() {
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function setSession(user) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
 }
 
 // Called at the top of admin.html / customer.html.
 // Redirects to index.html if not logged in or wrong role.
-async function requireRole(role) {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
+function requireRole(role) {
+  const user = getSession();
+  if (!user || user.role !== role) {
     window.location.href = "index.html";
     return null;
   }
-  const profile = await getProfile(session.user.id);
-  if (!profile || profile.role !== role) {
-    window.location.href = "index.html";
-    return null;
-  }
-  return profile;
+  return user;
 }
 
-async function logout() {
-  await sb.auth.signOut();
+function logout() {
+  clearSession();
   window.location.href = "index.html";
 }
 
