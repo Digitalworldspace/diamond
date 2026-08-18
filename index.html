@@ -20,8 +20,8 @@
 
     <form id="loginForm">
       <div class="field">
-        <label for="email">Email</label>
-        <input type="email" id="email" required autocomplete="username" placeholder="you@company.com" />
+        <label for="username">Username</label>
+        <input type="text" id="username" required autocomplete="username" placeholder="e.g. admin" />
       </div>
       <div class="field">
         <label for="password">Password</label>
@@ -30,7 +30,7 @@
       <button type="submit" class="btn btn-primary" style="width:100%; padding:11px;" id="loginBtn">Sign in</button>
     </form>
 
-    <p class="login-hint">Access is provided by your company administrator. Contact them if you don't have an account.</p>
+    <p class="login-hint">Access is provided by your company administrator. Contact them if you don't have a login.</p>
   </div>
 </div>
 
@@ -39,13 +39,9 @@
 <script src="js/auth.js"></script>
 <script>
   // If already signed in, jump straight to the right panel.
-  (async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) {
-      const profile = await getProfile(session.user.id);
-      if (profile?.role === "admin") window.location.href = "admin.html";
-      else if (profile?.role === "customer") window.location.href = "customer.html";
-    }
+  (function () {
+    const user = getSession();
+    if (user) window.location.href = user.role === "admin" ? "admin.html" : "customer.html";
   })();
 
   const form = document.getElementById("loginForm");
@@ -58,30 +54,32 @@
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Signing in…';
 
-    const email = document.getElementById("email").value.trim();
+    const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value;
 
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    const { data, error } = await sb
+      .from("users")
+      .select("*")
+      .eq("username", username)
+      .eq("password", password)
+      .maybeSingle();
+
+    btn.disabled = false;
+    btn.textContent = "Sign in";
 
     if (error) {
-      errorBox.textContent = error.message;
+      errorBox.textContent = "Something went wrong: " + error.message;
       errorBox.classList.add("show");
-      btn.disabled = false;
-      btn.textContent = "Sign in";
+      return;
+    }
+    if (!data) {
+      errorBox.textContent = "Incorrect username or password.";
+      errorBox.classList.add("show");
       return;
     }
 
-    const profile = await getProfile(data.user.id);
-    if (!profile) {
-      errorBox.textContent = "No profile found for this account. Ask your admin to set one up.";
-      errorBox.classList.add("show");
-      await sb.auth.signOut();
-      btn.disabled = false;
-      btn.textContent = "Sign in";
-      return;
-    }
-
-    window.location.href = profile.role === "admin" ? "admin.html" : "customer.html";
+    setSession(data);
+    window.location.href = data.role === "admin" ? "admin.html" : "customer.html";
   });
 </script>
 </body>
