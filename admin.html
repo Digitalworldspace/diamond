@@ -28,6 +28,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v14l-4 3v-3H4z"/></svg>
         Requests <span id="reqNavBadge"></span>
       </a>
+      <a class="nav-link" data-view="users">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
+        Users
+      </a>
       <a class="nav-link" data-view="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4.7a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.3a7 7 0 0 0-2 1.2l-2.4-.7-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-.7a7 7 0 0 0 2 1.2L10 21h4l.5-2.3a7 7 0 0 0 2-1.2l2.4.7 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/></svg>
         Settings
@@ -120,6 +124,22 @@
             <table>
               <thead><tr><th>Stone</th><th>Customer</th><th>Action requested</th><th>Note</th><th>Status</th><th>Date</th><th>Decision</th></tr></thead>
               <tbody id="requestsTbody"><tr><td colspan="7" class="loading-row">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- USERS -->
+      <section class="view" id="view-users">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Logins</h2>
+            <button class="btn btn-primary" onclick="openUserModal()">+ Add user</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Username</th><th>Full name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
+              <tbody id="usersTbody"><tr><td colspan="5" class="loading-row">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -245,6 +265,34 @@
 <!-- Lightbox -->
 <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
   <img id="lightboxImg" src="" alt="Stone image" />
+</div>
+
+<!-- User add/edit modal -->
+<div class="modal-overlay" id="userModalOverlay">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 id="userModalTitle">Add user</h2>
+      <button class="modal-close" onclick="closeUserModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="userForm">
+        <input type="hidden" id="u_id" />
+        <div class="field"><label>Username</label><input type="text" id="u_username" required /></div>
+        <div class="field"><label>Password</label><input type="text" id="u_password" required /><span class="hint">Stored as plain text in the table — keep this portal private to trusted users.</span></div>
+        <div class="field"><label>Full name</label><input type="text" id="u_full_name" /></div>
+        <div class="field"><label>Email</label><input type="email" id="u_email" /></div>
+        <div class="field">
+          <label>Role</label>
+          <select id="u_role"><option value="customer">Customer</option><option value="admin">Admin</option></select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-danger" id="deleteUserBtn" style="display:none; margin-right:auto;" onclick="deleteUser()">Delete user</button>
+          <button type="button" class="btn btn-ghost" onclick="closeUserModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="userSaveBtn">Save user</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
