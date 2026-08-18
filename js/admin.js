@@ -4,30 +4,33 @@
 
 let allStones = [];
 let allRequests = [];
+let allUsers = [];
 
 const pageMeta = {
   dashboard: ["Dashboard", "Overview of your stock and activity"],
   inventory: ["Inventory", "Add, edit and track every stone in stock"],
   requests: ["Requests", "Review hold and confirmation requests from customers"],
+  users: ["Users", "Create and manage admin and customer logins"],
   settings: ["Settings", "Company information shown on documents and to customers"],
 };
 
 (async function init() {
-  const profile = await requireRole("admin");
-  if (!profile) return;
+  const user = requireRole("admin");
+  if (!user) return;
 
-  document.getElementById("adminName").textContent = profile.full_name || "Admin";
-  document.getElementById("adminEmail").textContent = profile.email || "";
+  document.getElementById("adminName").textContent = user.full_name || user.username || "Admin";
+  document.getElementById("adminEmail").textContent = user.email || "";
 
   wireMenuToggle();
   wireNav();
   document.getElementById("settingsForm").addEventListener("submit", saveSettings);
   document.getElementById("stoneForm").addEventListener("submit", saveStone);
+  document.getElementById("userForm").addEventListener("submit", saveUser);
   document.getElementById("invSearch").addEventListener("input", renderInventory);
   document.getElementById("invStatusFilter").addEventListener("change", renderInventory);
   document.getElementById("reqStatusFilter").addEventListener("change", renderRequests);
 
-  await Promise.all([loadStones(), loadRequests(), loadSettings()]);
+  await Promise.all([loadStones(), loadRequests(), loadSettings(), loadUsers()]);
   renderDashboard();
 })();
 
@@ -327,4 +330,89 @@ async function saveSettings(e) {
 
   if (error) { showToast("Could not save settings: " + error.message, "error"); return; }
   showToast("Company information saved", "success");
+}
+
+/* ---------------- Users ---------------- */
+async function loadUsers() {
+  const { data, error } = await sb.from("users").select("*").order("created_at", { ascending: false });
+  if (error) { showToast("Could not load users: " + error.message, "error"); return; }
+  allUsers = data || [];
+  renderUsers();
+}
+
+function renderUsers() {
+  const tbody = document.getElementById("usersTbody");
+  if (allUsers.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="loading-row">No users yet. Add one to get started.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = allUsers.map((u) => `
+    <tr>
+      <td><strong>${escapeHtml(u.username)}</strong></td>
+      <td>${escapeHtml(u.full_name || "—")}</td>
+      <td>${escapeHtml(u.email || "—")}</td>
+      <td style="text-transform:capitalize;">${escapeHtml(u.role)}</td>
+      <td><button class="btn btn-sm" onclick='openUserModal(${JSON.stringify(u).replace(/'/g, "&apos;")})'>Edit</button></td>
+    </tr>
+  `).join("");
+}
+
+function openUserModal(user) {
+  const form = document.getElementById("userForm");
+  form.reset();
+  document.getElementById("deleteUserBtn").style.display = user ? "inline-flex" : "none";
+  document.getElementById("userModalTitle").textContent = user ? "Edit user" : "Add user";
+  document.getElementById("u_id").value = user?.id || "";
+  document.getElementById("u_username").value = user?.username || "";
+  document.getElementById("u_password").value = user?.password || "";
+  document.getElementById("u_full_name").value = user?.full_name || "";
+  document.getElementById("u_email").value = user?.email || "";
+  document.getElementById("u_role").value = user?.role || "customer";
+  document.getElementById("userModalOverlay").classList.add("show");
+}
+
+function closeUserModal() {
+  document.getElementById("userModalOverlay").classList.remove("show");
+}
+
+async function saveUser(e) {
+  e.preventDefault();
+  const id = document.getElementById("u_id").value;
+  const payload = {
+    username: document.getElementById("u_username").value.trim(),
+    password: document.getElementById("u_password").value,
+    full_name: document.getElementById("u_full_name").value.trim() || null,
+    email: document.getElementById("u_email").value.trim() || null,
+    role: document.getElementById("u_role").value,
+  };
+
+  const btn = document.getElementById("userSaveBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner dark"></span> Saving…';
+
+  let error;
+  if (id) {
+    ({ error } = await sb.from("users").update(payload).eq("id", id));
+  } else {
+    ({ error } = await sb.from("users").insert(payload));
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Save user";
+
+  if (error) { showToast("Could not save user: " + error.message, "error"); return; }
+  showToast(id ? "User updated" : "User added", "success");
+  closeUserModal();
+  await loadUsers();
+}
+
+async function deleteUser() {
+  const id = document.getElementById("u_id").value;
+  if (!id) return;
+  if (!confirm("Delete this user's login? This cannot be undone.")) return;
+  const { error } = await sb.from("users").delete().eq("id", id);
+  if (error) { showToast("Could not delete: " + error.message, "error"); return; }
+  showToast("User deleted", "success");
+  closeUserModal();
+  await loadUsers();
 }
