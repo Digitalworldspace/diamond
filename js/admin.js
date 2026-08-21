@@ -5,6 +5,7 @@
 let allStones = [];
 let allRequests = [];
 let allUsers = [];
+let invSelectedIds = new Set();
 
 const pageMeta = {
   dashboard: ["Dashboard", "Overview of your stock and activity"],
@@ -13,6 +14,17 @@ const pageMeta = {
   users: ["Users", "Create and manage admin and customer logins"],
   settings: ["Settings", "Company information shown on documents and to customers"],
 };
+
+const STONE_FIELDS_MAP = [
+  ["stone_id", "Stone ID"], ["location", "Location"], ["shape", "Shape"], ["cts", "Cts"],
+  ["size", "Size"], ["colour", "Colour"], ["clarity", "Clarity"], ["cut", "Cut"],
+  ["polish", "Polish"], ["symmetry", "Symmetry"], ["fluorescence", "Fluorescence"],
+  ["price_per_ct", "Price/Ct $"], ["total_price", "Total price $"], ["measurement", "Measurement"],
+  ["table_percent", "Table %"], ["depth_percent", "Depth %"], ["video_url", "Video"],
+  ["report_no", "Report no"], ["lab", "Lab"], ["company_comment", "Company comment"],
+  ["image_url", "Image"], ["stock_status", "Stock status"], ["certificate_link", "Certificate link"],
+];
+const NUMERIC_STONE_FIELDS = ["cts", "price_per_ct", "total_price", "table_percent", "depth_percent"];
 
 (async function init() {
   const user = requireRole("admin");
@@ -29,9 +41,14 @@ const pageMeta = {
   document.getElementById("invSearch").addEventListener("input", renderInventory);
   document.getElementById("invStatusFilter").addEventListener("change", renderInventory);
   document.getElementById("reqStatusFilter").addEventListener("change", renderRequests);
+  document.getElementById("invSelectAllChk").addEventListener("change", toggleInvSelectAll);
+  document.getElementById("logoUploadBtn").addEventListener("click", () => document.getElementById("logoFileInput").click());
+  document.getElementById("logoFileInput").addEventListener("change", handleLogoUpload);
+  document.getElementById("importFileInput").addEventListener("change", handleImportFile);
 
   await Promise.all([loadStones(), loadRequests(), loadSettings(), loadUsers()]);
   renderDashboard();
+  setupRealtime();
 })();
 
 function wireNav() {
@@ -45,16 +62,42 @@ function wireNav() {
       document.getElementById("pageTitle").textContent = pageMeta[view][0];
       document.getElementById("pageSubtitle").textContent = pageMeta[view][1];
       document.querySelector(".sidebar").classList.remove("open");
+      document.getElementById("invBulkBar").classList.toggle("show", view === "inventory" && invSelectedIds.size > 0);
     });
   });
+}
+
+/* ---------------- Realtime — live sync both directions ---------------- */
+function setupRealtime() {
+  sb.channel("admin-stones")
+    .on("postgres_changes", { event: "*", schema: "public", table: "stones" }, async () => {
+      await loadStones();
+      renderDashboard();
+    })
+    .subscribe();
+
+  sb.channel("admin-requests")
+    .on("postgres_changes", { event: "*", schema: "public", table: "stone_requests" }, async () => {
+      await loadRequests();
+      renderDashboard();
+    })
+    .subscribe();
+
+  sb.channel("admin-settings")
+    .on("postgres_changes", { event: "*", schema: "public", table: "company_settings" }, () => loadSettings())
+    .subscribe();
+
+  sb.channel("admin-users")
+    .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => loadUsers())
+    .subscribe();
 }
 
 /* ---------------- Dashboard ---------------- */
 function renderDashboard() {
   document.getElementById("statTotal").textContent = allStones.length;
-  document.getElementById("statAvailable").textContent = allStones.filter((s) => s.status === "available").length;
-  document.getElementById("statHold").textContent = allStones.filter((s) => s.status === "hold").length;
-  document.getElementById("statConfirmed").textContent = allStones.filter((s) => s.status === "confirmed").length;
+  document.getElementById("statAvailable").textContent = allStones.filter((s) => s.stock_status === "available").length;
+  document.getElementById("statHold").textContent = allStones.filter((s) => s.stock_status === "hold").length;
+  document.getElementById("statConfirmed").textContent = allStones.filter((s) => s.stock_status === "confirmed").length;
   const pendingCount = allRequests.filter((r) => r.status === "pending").length;
   document.getElementById("statPending").textContent = pendingCount;
 
@@ -93,38 +136,44 @@ function renderInventory() {
 
   let rows = allStones.filter((s) => {
     const matchesSearch = !search || (s.stone_id || "").toLowerCase().includes(search) || (s.shape || "").toLowerCase().includes(search);
-    const matchesStatus = !status || s.status === status;
+    const matchesStatus = !status || s.stock_status === status;
     return matchesSearch && matchesStatus;
   });
 
   const tbody = document.getElementById("inventoryTbody");
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state">
       <svg class="diamond-mark" viewBox="0 0 24 24"><path d="M4 9 L12 3 L20 9 L12 21 Z M4 9 L20 9 M9 9 L12 3 L15 9 M9 9 L12 21 M15 9 L12 21"/></svg>
-      <h3>No stones found</h3><p>Try a different search or add a new stone.</p>
+      <h3>No stones found</h3><p>Try a different search, or add / import stones.</p>
     </div></td></tr>`;
     return;
   }
 
-  tbody.innerHTML = rows.map((s) => `
-    <tr>
+  tbody.innerHTML = rows.map((s) => {
+    const checked = invSelectedIds.has(s.id) ? "checked" : "";
+    return `
+    <tr class="${invSelectedIds.has(s.id) ? "row-selected" : ""}" data-id="${s.id}">
+      <td><input type="checkbox" class="chk inv-row-chk" data-id="${s.id}" ${checked} onchange="toggleInvRow('${s.id}', this.checked)" /></td>
       <td>
         <div class="stone-cell">
           <img class="stone-thumb" src="${escapeHtml(s.image_url) || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" onclick="openLightbox('${escapeHtml(s.image_url) || ""}')" alt="${escapeHtml(s.stone_id)}" />
-          <div><div class="stone-id">${escapeHtml(s.stone_id)}</div><div class="stone-sub">${escapeHtml(s.lab || "")} ${escapeHtml(s.certificate_no || "")}</div></div>
+          <div><div class="stone-id">${escapeHtml(s.stone_id)}</div><div class="stone-sub">${escapeHtml(s.lab || "")} ${escapeHtml(s.report_no || "")}</div></div>
         </div>
       </td>
       <td>${escapeHtml(s.shape || "—")}</td>
-      <td>${s.carat ?? "—"}</td>
-      <td>${escapeHtml(s.color || "—")}</td>
+      <td>${s.cts ?? "—"}</td>
+      <td>${escapeHtml(s.colour || "—")}</td>
       <td>${escapeHtml(s.clarity || "—")}</td>
-      <td>${fmtPrice(s.price)}</td>
-      <td>${badgeForStatus(s.status)}</td>
+      <td>${fmtPrice(s.total_price)}</td>
+      <td>${badgeForStatus(s.stock_status)}</td>
       <td><div class="row-actions">
         <button class="btn btn-sm" onclick='openStoneModal(${JSON.stringify(s).replace(/'/g, "&apos;")})'>Edit</button>
       </div></td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
+
+  updateInvBulkBar();
 }
 
 function openStoneModal(stone) {
@@ -132,20 +181,32 @@ function openStoneModal(stone) {
   form.reset();
   document.getElementById("deleteStoneBtn").style.display = stone ? "inline-flex" : "none";
   document.getElementById("stoneModalTitle").textContent = stone ? "Edit stone" : "Add stone";
+
   document.getElementById("f_id").value = stone?.id || "";
   document.getElementById("f_stone_id").value = stone?.stone_id || "";
+  document.getElementById("f_location").value = stone?.location || "";
   document.getElementById("f_image_url").value = stone?.image_url || "";
+  document.getElementById("f_video_url").value = stone?.video_url || "";
   document.getElementById("f_shape").value = stone?.shape || "Round";
-  document.getElementById("f_carat").value = stone?.carat ?? "";
-  document.getElementById("f_color").value = stone?.color || "";
+  document.getElementById("f_cts").value = stone?.cts ?? "";
+  document.getElementById("f_size").value = stone?.size || "";
+  document.getElementById("f_colour").value = stone?.colour || "";
   document.getElementById("f_clarity").value = stone?.clarity || "VS1";
   document.getElementById("f_cut").value = stone?.cut || "Excellent";
+  document.getElementById("f_polish").value = stone?.polish || "Excellent";
+  document.getElementById("f_symmetry").value = stone?.symmetry || "Excellent";
   document.getElementById("f_fluorescence").value = stone?.fluorescence || "None";
-  document.getElementById("f_measurements").value = stone?.measurements || "";
+  document.getElementById("f_measurement").value = stone?.measurement || "";
+  document.getElementById("f_table_percent").value = stone?.table_percent ?? "";
+  document.getElementById("f_depth_percent").value = stone?.depth_percent ?? "";
+  document.getElementById("f_price_per_ct").value = stone?.price_per_ct ?? "";
+  document.getElementById("f_total_price").value = stone?.total_price ?? "";
   document.getElementById("f_lab").value = stone?.lab || "GIA";
-  document.getElementById("f_certificate_no").value = stone?.certificate_no || "";
-  document.getElementById("f_price").value = stone?.price ?? "";
-  document.getElementById("f_status").value = stone?.status || "available";
+  document.getElementById("f_report_no").value = stone?.report_no || "";
+  document.getElementById("f_certificate_link").value = stone?.certificate_link || "";
+  document.getElementById("f_stock_status").value = stone?.stock_status || "available";
+  document.getElementById("f_company_comment").value = stone?.company_comment || "";
+
   document.getElementById("stoneModalOverlay").classList.add("show");
 }
 
@@ -158,18 +219,28 @@ async function saveStone(e) {
   const id = document.getElementById("f_id").value;
   const payload = {
     stone_id: document.getElementById("f_stone_id").value.trim(),
+    location: document.getElementById("f_location").value.trim() || null,
     image_url: document.getElementById("f_image_url").value.trim() || null,
+    video_url: document.getElementById("f_video_url").value.trim() || null,
     shape: document.getElementById("f_shape").value,
-    carat: parseFloat(document.getElementById("f_carat").value) || null,
-    color: document.getElementById("f_color").value.trim() || null,
+    cts: parseFloat(document.getElementById("f_cts").value) || null,
+    size: document.getElementById("f_size").value.trim() || null,
+    colour: document.getElementById("f_colour").value.trim() || null,
     clarity: document.getElementById("f_clarity").value,
     cut: document.getElementById("f_cut").value,
+    polish: document.getElementById("f_polish").value,
+    symmetry: document.getElementById("f_symmetry").value,
     fluorescence: document.getElementById("f_fluorescence").value,
-    measurements: document.getElementById("f_measurements").value.trim() || null,
+    measurement: document.getElementById("f_measurement").value.trim() || null,
+    table_percent: parseFloat(document.getElementById("f_table_percent").value) || null,
+    depth_percent: parseFloat(document.getElementById("f_depth_percent").value) || null,
+    price_per_ct: parseFloat(document.getElementById("f_price_per_ct").value) || null,
+    total_price: parseFloat(document.getElementById("f_total_price").value) || null,
     lab: document.getElementById("f_lab").value,
-    certificate_no: document.getElementById("f_certificate_no").value.trim() || null,
-    price: parseFloat(document.getElementById("f_price").value) || null,
-    status: document.getElementById("f_status").value,
+    report_no: document.getElementById("f_report_no").value.trim() || null,
+    certificate_link: document.getElementById("f_certificate_link").value.trim() || null,
+    stock_status: document.getElementById("f_stock_status").value,
+    company_comment: document.getElementById("f_company_comment").value.trim() || null,
   };
 
   const btn = document.getElementById("stoneSaveBtn");
@@ -214,11 +285,224 @@ function closeLightbox() {
   document.getElementById("lightbox").classList.remove("show");
 }
 
+/* ---------------- Inventory bulk selection & actions ---------------- */
+function toggleInvRow(id, checked) {
+  if (checked) invSelectedIds.add(id); else invSelectedIds.delete(id);
+  const row = document.querySelector(`#inventoryTbody tr[data-id="${id}"]`);
+  if (row) row.classList.toggle("row-selected", checked);
+  updateInvBulkBar();
+}
+
+function toggleInvSelectAll(e) {
+  const checked = e.target.checked;
+  document.querySelectorAll(".inv-row-chk").forEach((chk) => {
+    chk.checked = checked;
+    toggleInvRow(chk.dataset.id, checked);
+  });
+}
+
+function clearInvSelection() {
+  invSelectedIds.clear();
+  document.getElementById("invSelectAllChk").checked = false;
+  renderInventory();
+}
+
+function updateInvBulkBar() {
+  const count = invSelectedIds.size;
+  document.getElementById("invBulkCount").textContent = count;
+  document.getElementById("invBulkBar").classList.toggle("show", count > 0);
+}
+
+async function bulkSetStatus(status) {
+  if (invSelectedIds.size === 0) return;
+  const { error } = await sb.from("stones").update({ stock_status: status }).in("id", Array.from(invSelectedIds));
+  if (error) { showToast("Could not update stones: " + error.message, "error"); return; }
+  showToast(`${invSelectedIds.size} stone(s) marked ${status}`, "success");
+  clearInvSelection();
+  await loadStones();
+  renderDashboard();
+}
+
+async function bulkDeleteStones() {
+  if (invSelectedIds.size === 0) return;
+  if (!confirm(`Delete ${invSelectedIds.size} stone(s) permanently? This cannot be undone.`)) return;
+  const { error } = await sb.from("stones").delete().in("id", Array.from(invSelectedIds));
+  if (error) { showToast("Could not delete stones: " + error.message, "error"); return; }
+  showToast(`${invSelectedIds.size} stone(s) deleted`, "success");
+  clearInvSelection();
+  await loadStones();
+  renderDashboard();
+}
+
+/* ---------------- Excel / CSV import with smart column matching ---------------- */
+const FIELD_ALIASES = {
+  stone_id: ["stone id", "stoneid", "packet id", "packet no", "packetno", "lot no", "lot number", "id", "stock id", "stockno", "stock no"],
+  location: ["location", "loc"],
+  shape: ["shape"],
+  cts: ["cts", "carat", "carats", "ct", "wt", "weight"],
+  size: ["size", "sieve", "sieve size"],
+  colour: ["colour", "color"],
+  clarity: ["clarity"],
+  cut: ["cut"],
+  polish: ["po", "polish", "pol"],
+  symmetry: ["sym", "symmetry", "symm"],
+  fluorescence: ["fls", "fl", "fluorescence", "fluro"],
+  price_per_ct: ["ct/pr $", "ct/pr", "ctpr", "price per ct", "price/ct", "rate", "rap", "rap %", "rate/ct"],
+  total_price: ["total price $", "total price", "amount", "total", "total amount", "totalprice"],
+  measurement: ["measurment", "measurement", "measurements", "dimensions", "dimension", "meas"],
+  table_percent: ["table %", "table%", "table"],
+  depth_percent: ["depth %", "depth%", "depth"],
+  video_url: ["video", "video link", "video url", "videolink"],
+  report_no: ["report no", "report number", "certificate no", "cert no", "certno", "reportno"],
+  lab: ["lab"],
+  company_comment: ["company comment", "comment", "comments", "remark", "remarks"],
+  image_url: ["image", "img", "image url", "photo", "picture"],
+  stock_status: ["stock status", "status", "stockstatus"],
+  certificate_link: ["certificate link", "cert link", "certificate url", "certlink"],
+};
+
+function normalizeHeader(h) {
+  return String(h || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function guessFieldForHeader(header) {
+  const norm = normalizeHeader(header);
+  if (!norm) return "";
+  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+    if (aliases.some((a) => normalizeHeader(a) === norm)) return field;
+  }
+  return "";
+}
+
+let importHeaders = [];
+let importRows = [];
+let importMapping = {};
+
+function openImportModal() {
+  importHeaders = [];
+  importRows = [];
+  importMapping = {};
+  document.getElementById("importStep1").style.display = "block";
+  document.getElementById("importStep2").style.display = "none";
+  document.getElementById("importSubmitBtn").style.display = "none";
+  document.getElementById("importFileInput").value = "";
+  document.getElementById("importModalOverlay").classList.add("show");
+}
+
+function closeImportModal() {
+  document.getElementById("importModalOverlay").classList.remove("show");
+}
+
+function handleImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
+      if (rows.length < 2) { showToast("This file doesn't have any data rows", "error"); return; }
+      importHeaders = rows[0].map((h) => String(h).trim());
+      importRows = rows.slice(1).filter((r) => r.some((cell) => String(cell).trim() !== ""));
+      renderImportMapping();
+    } catch (err) {
+      showToast("Could not read this file: " + err.message, "error");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderImportMapping() {
+  document.getElementById("importStep1").style.display = "none";
+  document.getElementById("importStep2").style.display = "block";
+  document.getElementById("importSubmitBtn").style.display = "inline-flex";
+  document.getElementById("importRowCount").textContent = importRows.length;
+
+  const optionList = [["", "— Skip this column —"], ...STONE_FIELDS_MAP];
+
+  const tbody = document.getElementById("importMappingTbody");
+  tbody.innerHTML = importHeaders.map((h, i) => {
+    const guess = guessFieldForHeader(h);
+    importMapping[i] = guess;
+    const options = optionList.map(([val, label]) => `<option value="${val}" ${val === guess ? "selected" : ""}>${escapeHtml(label)}</option>`).join("");
+    return `<tr><td>${escapeHtml(h) || "(blank)"}</td><td><select class="select-filter" onchange="importMapping[${i}] = this.value">${options}</select></td></tr>`;
+  }).join("");
+
+  const head = document.getElementById("importPreviewHead");
+  head.innerHTML = "<tr>" + importHeaders.map((h) => `<th>${escapeHtml(h)}</th>`).join("") + "</tr>";
+  const body = document.getElementById("importPreviewBody");
+  body.innerHTML = importRows.slice(0, 5).map((r) =>
+    "<tr>" + importHeaders.map((_, i) => `<td>${escapeHtml(r[i] ?? "")}</td>`).join("") + "</tr>"
+  ).join("");
+}
+
+async function runImport() {
+  const btn = document.getElementById("importSubmitBtn");
+  const mappedFields = Object.values(importMapping).filter(Boolean);
+  if (!mappedFields.includes("stone_id")) {
+    showToast("Map a column to Stone ID before importing", "error");
+    return;
+  }
+
+  const records = importRows.map((row) => {
+    const rec = {};
+    importHeaders.forEach((_, i) => {
+      const field = importMapping[i];
+      if (!field) return;
+      let value = row[i];
+      if (value === undefined || String(value).trim() === "") { value = null; }
+      if (NUMERIC_STONE_FIELDS.includes(field) && value !== null) {
+        value = parseFloat(String(value).replace(/,/g, "")) || null;
+      }
+      if (field === "stock_status" && value) {
+        const v = String(value).trim().toLowerCase();
+        value = ["available", "hold", "confirmed", "sold"].includes(v) ? v : "available";
+      }
+      if (typeof value === "string") value = value.trim();
+      rec[field] = value;
+    });
+    if (!rec.stock_status) rec.stock_status = "available";
+    return rec;
+  }).filter((r) => r.stone_id);
+
+  if (records.length === 0) {
+    showToast("No valid rows with a Stone ID found", "error");
+    return;
+  }
+
+  btn.disabled = true;
+  const total = records.length;
+  const chunkSize = 300;
+  let imported = 0;
+
+  for (let i = 0; i < records.length; i += chunkSize) {
+    const chunk = records.slice(i, i + chunkSize);
+    btn.innerHTML = `<span class="spinner dark"></span> Importing ${imported}/${total}…`;
+    const { error } = await sb.from("stones").upsert(chunk, { onConflict: "stone_id" });
+    if (error) {
+      showToast("Import stopped: " + error.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Import stones";
+      return;
+    }
+    imported += chunk.length;
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Import stones";
+  showToast(`Imported ${imported} stone(s)`, "success");
+  closeImportModal();
+  await loadStones();
+  renderDashboard();
+}
+
 /* ---------------- Requests ---------------- */
 async function loadRequests() {
   const { data, error } = await sb
     .from("stone_requests")
-    .select("*, stones(stone_id, image_url, status)")
+    .select("*, stones(stone_id, image_url, stock_status)")
     .order("created_at", { ascending: false });
   if (error) { showToast("Could not load requests: " + error.message, "error"); return; }
   allRequests = data || [];
@@ -270,16 +554,10 @@ async function decideRequest(requestId, decision) {
   if (reqError) { showToast("Could not update request: " + reqError.message, "error"); return; }
 
   if (decision === "approved") {
-    const statusMap = {
-      hold: "hold",
-      confirm: "confirmed",
-      request_video: null,
-      request_memo: null,
-      request_certificate: null,
-    };
+    const statusMap = { hold: "hold", confirm: "confirmed" };
     const newStoneStatus = statusMap[req.action_type];
     if (newStoneStatus) {
-      const { error: stoneError } = await sb.from("stones").update({ status: newStoneStatus }).eq("id", req.stone_id);
+      const { error: stoneError } = await sb.from("stones").update({ stock_status: newStoneStatus }).eq("id", req.stone_id);
       if (stoneError) showToast("Request approved, but stone status update failed: " + stoneError.message, "error");
     }
   }
@@ -289,7 +567,7 @@ async function decideRequest(requestId, decision) {
   renderDashboard();
 }
 
-/* ---------------- Settings ---------------- */
+/* ---------------- Settings (incl. logo upload) ---------------- */
 async function loadSettings() {
   const { data, error } = await sb.from("company_settings").select("*").eq("id", COMPANY_SETTINGS_ID).maybeSingle();
   if (error) { showToast("Could not load settings: " + error.message, "error"); return; }
@@ -305,6 +583,58 @@ async function loadSettings() {
     const el = document.getElementById("s_" + f);
     if (el) el.value = data[f] || "";
   });
+
+  const preview = document.getElementById("logoPreview");
+  if (data.logo_url) {
+    preview.src = data.logo_url;
+    preview.style.display = "block";
+  }
+
+  updateSidebarBrand(data.company_name, data.logo_url);
+}
+
+function updateSidebarBrand(companyName, logoUrl) {
+  const nameLabel = document.querySelector("#sidebarBrand span");
+  if (nameLabel && companyName) nameLabel.textContent = companyName;
+  const brand = document.getElementById("sidebarBrand");
+  if (brand && logoUrl && !brand.querySelector("img")) {
+    const svg = brand.querySelector("svg");
+    const img = document.createElement("img");
+    img.src = logoUrl;
+    img.alt = "Logo";
+    img.style.cssText = "width:26px;height:26px;object-fit:contain;border-radius:4px;";
+    if (svg) svg.replaceWith(img);
+  } else if (brand && logoUrl) {
+    brand.querySelector("img").src = logoUrl;
+  }
+}
+
+async function handleLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!["image/jpeg", "image/png"].includes(file.type)) {
+    showToast("Please choose a JPEG or PNG file", "error");
+    return;
+  }
+  const statusEl = document.getElementById("logoUploadStatus");
+  statusEl.textContent = "Uploading…";
+
+  const ext = file.type === "image/png" ? "png" : "jpg";
+  const path = `logo-${Date.now()}.${ext}`;
+
+  const { error } = await sb.storage.from("portal-assets").upload(path, file, { upsert: true, contentType: file.type });
+  if (error) {
+    statusEl.textContent = "";
+    showToast("Logo upload failed: " + error.message, "error");
+    return;
+  }
+
+  const { data } = sb.storage.from("portal-assets").getPublicUrl(path);
+  document.getElementById("s_logo_url").value = data.publicUrl;
+  const preview = document.getElementById("logoPreview");
+  preview.src = data.publicUrl;
+  preview.style.display = "block";
+  statusEl.textContent = "Uploaded — click Save changes to apply.";
 }
 
 async function saveSettings(e) {
@@ -330,6 +660,7 @@ async function saveSettings(e) {
 
   if (error) { showToast("Could not save settings: " + error.message, "error"); return; }
   showToast("Company information saved", "success");
+  document.getElementById("logoUploadStatus").textContent = "";
 }
 
 /* ---------------- Users ---------------- */
