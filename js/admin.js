@@ -6,6 +6,7 @@ let allStones = [];
 let allRequests = [];
 let allUsers = [];
 let invSelectedIds = new Set();
+let currentUser = null;
 
 const pageMeta = {
   dashboard: ["Dashboard", "Overview of your stock and activity"],
@@ -29,6 +30,7 @@ const NUMERIC_STONE_FIELDS = ["cts", "price_per_ct", "total_price", "table_perce
 (async function init() {
   const user = requireRole("admin");
   if (!user) return;
+  currentUser = user;
 
   document.getElementById("adminName").textContent = user.full_name || user.username || "Admin";
   document.getElementById("adminEmail").textContent = user.email || "";
@@ -89,6 +91,28 @@ function setupRealtime() {
 
   sb.channel("admin-users")
     .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => loadUsers())
+    .subscribe();
+
+  // If someone edits or removes the currently signed-in admin's own login
+  // (from another tab, another admin, or Table Editor), reflect it live.
+  sb.channel("admin-own-session")
+    .on("postgres_changes", { event: "*", schema: "public", table: "users" }, (payload) => {
+      const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+      if (!row || row.id !== currentUser.id) return;
+
+      if (payload.eventType === "DELETE" || row.role !== "admin") {
+        showToast("Your access has changed. Please sign in again.", "error");
+        clearSession();
+        setTimeout(() => { window.location.href = "index.html"; }, 1200);
+        return;
+      }
+
+      // Password, name, or email changed on this account — keep the local session in sync.
+      currentUser = row;
+      setSession(row);
+      document.getElementById("adminName").textContent = row.full_name || row.username || "Admin";
+      document.getElementById("adminEmail").textContent = row.email || "";
+    })
     .subscribe();
 }
 
