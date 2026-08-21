@@ -11,7 +11,7 @@
 <div class="app-shell">
 
   <aside class="sidebar">
-    <div class="sidebar-brand">
+    <div class="sidebar-brand" id="sidebarBrand">
       <svg class="diamond-mark" viewBox="0 0 24 24"><path d="M4 9 L12 3 L20 9 L12 21 Z M4 9 L20 9 M9 9 L12 3 L15 9 M9 9 L12 21 M15 9 L12 21"/></svg>
       <div><span>Diamond Portal</span><small>Admin</small></div>
     </div>
@@ -52,6 +52,9 @@
           <p id="pageSubtitle">Overview of your stock and activity</p>
         </div>
       </div>
+      <span class="text-muted" id="liveIndicator" style="font-size:0.78rem; display:flex; align-items:center; gap:6px;">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;"></span> Live
+      </span>
     </div>
 
     <div class="content">
@@ -94,14 +97,20 @@
                 <option value="sold">Sold</option>
               </select>
             </div>
-            <button class="btn btn-primary" onclick="openStoneModal()">+ Add stone</button>
+            <div class="toolbar">
+              <button class="btn" onclick="openImportModal()">Import Excel</button>
+              <button class="btn btn-primary" onclick="openStoneModal()">+ Add stone</button>
+            </div>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Stone</th><th>Shape</th><th>Carat</th><th>Color</th><th>Clarity</th><th>Price</th><th>Status</th><th>Actions</th></tr>
+                <tr>
+                  <th style="width:34px;"><input type="checkbox" class="chk" id="invSelectAllChk" /></th>
+                  <th>Stone</th><th>Shape</th><th>Cts</th><th>Colour</th><th>Clarity</th><th>Total price</th><th>Status</th><th>Actions</th>
+                </tr>
               </thead>
-              <tbody id="inventoryTbody"><tr><td colspan="8" class="loading-row">Loading…</td></tr></tbody>
+              <tbody id="inventoryTbody"><tr><td colspan="9" class="loading-row">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -158,7 +167,16 @@
                 <div class="field"><label>Website</label><input type="text" id="s_website" placeholder="https://" /></div>
                 <div class="field"><label>Email</label><input type="email" id="s_email" /></div>
                 <div class="field"><label>Phone</label><input type="text" id="s_phone" /></div>
-                <div class="field full"><label>Logo URL</label><input type="text" id="s_logo_url" placeholder="https://…/logo.png" /></div>
+                <div class="field full">
+                  <label>Company logo</label>
+                  <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                    <img id="logoPreview" src="" alt="Logo preview" style="width:64px;height:64px;border-radius:var(--radius-sm);border:1px solid var(--border); object-fit:contain; background:var(--bg-soft); display:none;" />
+                    <input type="file" id="logoFileInput" accept="image/png, image/jpeg" style="display:none;" />
+                    <button type="button" class="btn btn-sm" id="logoUploadBtn">Upload logo (JPEG/PNG)</button>
+                    <span class="text-muted" id="logoUploadStatus" style="font-size:0.8rem;"></span>
+                  </div>
+                  <input type="hidden" id="s_logo_url" />
+                </div>
               </div>
 
               <div class="form-section-title">Address</div>
@@ -206,10 +224,17 @@
     <div class="modal-body">
       <form id="stoneForm">
         <input type="hidden" id="f_id" />
-        <div class="form-grid">
-          <div class="field"><label>Stone ID / Lot no.</label><input type="text" id="f_stone_id" required /></div>
-          <div class="field"><label>Image URL</label><input type="text" id="f_image_url" placeholder="https://…" /></div>
 
+        <div class="form-section-title">Identification</div>
+        <div class="form-grid">
+          <div class="field"><label>Stone ID</label><input type="text" id="f_stone_id" required /></div>
+          <div class="field"><label>Location</label><input type="text" id="f_location" /></div>
+          <div class="field"><label>Image URL</label><input type="text" id="f_image_url" placeholder="https://…" /></div>
+          <div class="field"><label>Video link</label><input type="text" id="f_video_url" placeholder="https://…" /></div>
+        </div>
+
+        <div class="form-section-title">Stone details</div>
+        <div class="form-grid">
           <div class="field">
             <label>Shape</label>
             <select id="f_shape">
@@ -218,9 +243,10 @@
               <option>Asscher</option><option>Heart</option>
             </select>
           </div>
-          <div class="field"><label>Carat</label><input type="number" step="0.01" id="f_carat" /></div>
+          <div class="field"><label>Cts</label><input type="number" step="0.01" id="f_cts" /></div>
+          <div class="field"><label>Size</label><input type="text" id="f_size" /></div>
+          <div class="field"><label>Colour</label><input type="text" id="f_colour" placeholder="e.g. D, E, F…" /></div>
 
-          <div class="field"><label>Color</label><input type="text" id="f_color" placeholder="e.g. D, E, F…" /></div>
           <div class="field">
             <label>Clarity</label>
             <select id="f_clarity">
@@ -229,29 +255,53 @@
               <option>I1</option><option>I2</option><option>I3</option>
             </select>
           </div>
-
           <div class="field">
             <label>Cut</label>
             <select id="f_cut"><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option></select>
           </div>
           <div class="field">
+            <label>Polish</label>
+            <select id="f_polish"><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option></select>
+          </div>
+          <div class="field">
+            <label>Symmetry</label>
+            <select id="f_symmetry"><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option></select>
+          </div>
+
+          <div class="field">
             <label>Fluorescence</label>
             <select id="f_fluorescence"><option>None</option><option>Faint</option><option>Medium</option><option>Strong</option></select>
           </div>
+          <div class="field"><label>Measurement</label><input type="text" id="f_measurement" placeholder="e.g. 6.5 x 6.5 x 4.0" /></div>
+          <div class="field"><label>Table %</label><input type="number" step="0.1" id="f_table_percent" /></div>
+          <div class="field"><label>Depth %</label><input type="number" step="0.1" id="f_depth_percent" /></div>
+        </div>
 
-          <div class="field"><label>Measurements (mm)</label><input type="text" id="f_measurements" placeholder="e.g. 6.5 x 6.5 x 4.0" /></div>
-          <div class="field"><label>Lab</label>
+        <div class="form-section-title">Pricing</div>
+        <div class="form-grid">
+          <div class="field"><label>Price / Ct ($)</label><input type="number" step="0.01" id="f_price_per_ct" /></div>
+          <div class="field"><label>Total price ($)</label><input type="number" step="0.01" id="f_total_price" /></div>
+        </div>
+
+        <div class="form-section-title">Certification</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Lab</label>
             <select id="f_lab"><option>GIA</option><option>IGI</option><option>HRD</option><option>Other</option></select>
           </div>
-
-          <div class="field"><label>Certificate no.</label><input type="text" id="f_certificate_no" /></div>
-          <div class="field"><label>Price (USD)</label><input type="number" step="0.01" id="f_price" /></div>
-
-          <div class="field full">
-            <label>Status</label>
-            <select id="f_status"><option value="available">Available</option><option value="hold">Hold</option><option value="confirmed">Confirmed</option><option value="sold">Sold</option></select>
-          </div>
+          <div class="field"><label>Report no.</label><input type="text" id="f_report_no" /></div>
+          <div class="field full"><label>Certificate link</label><input type="text" id="f_certificate_link" placeholder="https://…" /></div>
         </div>
+
+        <div class="form-section-title">Status &amp; notes</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Stock status</label>
+            <select id="f_stock_status"><option value="available">Available</option><option value="hold">Hold</option><option value="confirmed">Confirmed</option><option value="sold">Sold</option></select>
+          </div>
+          <div class="field full"><label>Company comment</label><textarea id="f_company_comment"></textarea></div>
+        </div>
+
         <div class="form-actions">
           <button type="button" class="btn btn-danger" id="deleteStoneBtn" style="display:none; margin-right:auto;" onclick="deleteStone()">Delete stone</button>
           <button type="button" class="btn btn-ghost" onclick="closeStoneModal()">Cancel</button>
@@ -262,9 +312,48 @@
   </div>
 </div>
 
-<!-- Lightbox -->
-<div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
-  <img id="lightboxImg" src="" alt="Stone image" />
+<!-- Excel import modal -->
+<div class="modal-overlay" id="importModalOverlay">
+  <div class="modal" style="max-width: 860px;">
+    <div class="modal-header">
+      <h2>Import stones from Excel</h2>
+      <button class="modal-close" onclick="closeImportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div id="importStep1">
+        <div class="field">
+          <label>Choose an Excel or CSV file</label>
+          <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" />
+          <span class="hint">First row must be column headers, e.g. STONE ID, SHAPE, CTS… We'll try to match them automatically.</span>
+        </div>
+      </div>
+
+      <div id="importStep2" style="display:none;">
+        <p class="text-muted" style="margin-bottom:12px;">
+          Found <strong id="importRowCount">0</strong> rows. Check the matching below — existing stones with the same Stone ID will be updated, new ones will be added.
+        </p>
+        <div class="table-wrap" style="max-height:230px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:16px;">
+          <table>
+            <thead><tr><th>Your column</th><th>Maps to</th></tr></thead>
+            <tbody id="importMappingTbody"></tbody>
+          </table>
+        </div>
+        <p class="text-muted" style="margin-bottom:8px; font-size:0.8rem;">Preview (first rows):</p>
+        <div class="table-wrap" style="max-height:180px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--radius-sm);">
+          <table>
+            <thead id="importPreviewHead"></thead>
+            <tbody id="importPreviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeImportModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="importSubmitBtn" style="display:none;" onclick="runImport()">Import stones</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- User add/edit modal -->
@@ -295,7 +384,26 @@
   </div>
 </div>
 
+<!-- Inventory bulk action bar -->
+<div class="bulk-bar" id="invBulkBar">
+  <div class="count"><span id="invBulkCount">0</span> stone(s) selected</div>
+  <div class="bulk-actions">
+    <button class="btn" onclick="bulkSetStatus('available')">Mark available</button>
+    <button class="btn" onclick="bulkSetStatus('hold')">Mark hold</button>
+    <button class="btn btn-gold" onclick="bulkSetStatus('confirmed')">Mark confirmed</button>
+    <button class="btn" onclick="bulkSetStatus('sold')">Mark sold</button>
+    <button class="btn btn-danger" onclick="bulkDeleteStones()">Delete</button>
+  </div>
+  <button class="clear-link" onclick="clearInvSelection()">Clear selection</button>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" alt="Stone image" />
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/admin.js"></script>
