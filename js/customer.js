@@ -25,7 +25,7 @@ const ACTION_LABELS = {
 
   wireMenuToggle();
   wireNav();
-  loadCompanyName();
+  loadCompanySettings();
 
   document.getElementById("stoneSearch").addEventListener("input", renderStones);
   document.getElementById("stoneStatusFilter").addEventListener("change", renderStones);
@@ -33,6 +33,7 @@ const ACTION_LABELS = {
 
   await loadStones();
   await loadMyRequests();
+  setupRealtime();
 })();
 
 function wireNav() {
@@ -54,9 +55,43 @@ function wireNav() {
   });
 }
 
-async function loadCompanyName() {
-  const { data } = await sb.from("company_settings").select("company_name").eq("id", COMPANY_SETTINGS_ID).maybeSingle();
-  if (data?.company_name) document.getElementById("companyNameTag").textContent = data.company_name;
+/* ---------------- Realtime — live sync both directions ---------------- */
+function setupRealtime() {
+  sb.channel("customer-stones")
+    .on("postgres_changes", { event: "*", schema: "public", table: "stones" }, () => loadStones())
+    .subscribe();
+
+  sb.channel("customer-requests")
+    .on("postgres_changes", { event: "*", schema: "public", table: "stone_requests" }, (payload) => {
+      const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+      if (row && row.customer_id === myProfile.id) loadMyRequests();
+    })
+    .subscribe();
+
+  sb.channel("customer-settings")
+    .on("postgres_changes", { event: "*", schema: "public", table: "company_settings" }, () => loadCompanySettings())
+    .subscribe();
+}
+
+async function loadCompanySettings() {
+  const { data } = await sb.from("company_settings").select("company_name, logo_url").eq("id", COMPANY_SETTINGS_ID).maybeSingle();
+  if (!data) return;
+  if (data.company_name) document.getElementById("companyNameTag").textContent = data.company_name;
+
+  const brand = document.getElementById("sidebarBrand");
+  if (brand && data.logo_url) {
+    const existingImg = brand.querySelector("img");
+    if (existingImg) {
+      existingImg.src = data.logo_url;
+    } else {
+      const svg = brand.querySelector("svg");
+      const img = document.createElement("img");
+      img.src = data.logo_url;
+      img.alt = "Logo";
+      img.style.cssText = "width:26px;height:26px;object-fit:contain;border-radius:4px;";
+      if (svg) svg.replaceWith(img);
+    }
+  }
 }
 
 /* ---------------- Stones list ---------------- */
@@ -73,7 +108,7 @@ function renderStones() {
 
   const rows = allStones.filter((s) => {
     const matchesSearch = !search || (s.stone_id || "").toLowerCase().includes(search) || (s.shape || "").toLowerCase().includes(search);
-    const matchesStatus = !status || s.status === status;
+    const matchesStatus = !status || s.stock_status === status;
     return matchesSearch && matchesStatus;
   });
 
@@ -87,7 +122,7 @@ function renderStones() {
   }
 
   tbody.innerHTML = rows.map((s) => {
-    const locked = s.status === "sold";
+    const locked = s.stock_status === "sold";
     const checked = selectedIds.has(s.id) ? "checked" : "";
     return `
     <tr class="${selectedIds.has(s.id) ? "row-selected" : ""}" data-id="${s.id}">
@@ -95,15 +130,15 @@ function renderStones() {
       <td>
         <div class="stone-cell">
           <img class="stone-thumb" src="${escapeHtml(s.image_url) || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" onclick="openLightbox('${escapeHtml(s.image_url) || ""}')" alt="${escapeHtml(s.stone_id)}" />
-          <div><div class="stone-id">${escapeHtml(s.stone_id)}</div><div class="stone-sub">${escapeHtml(s.lab || "")} ${escapeHtml(s.certificate_no || "")}</div></div>
+          <div><div class="stone-id">${escapeHtml(s.stone_id)}</div><div class="stone-sub">${escapeHtml(s.lab || "")} ${escapeHtml(s.report_no || "")}</div></div>
         </div>
       </td>
       <td>${escapeHtml(s.shape || "—")}</td>
-      <td>${s.carat ?? "—"}</td>
-      <td>${escapeHtml(s.color || "—")}</td>
+      <td>${s.cts ?? "—"}</td>
+      <td>${escapeHtml(s.colour || "—")}</td>
       <td>${escapeHtml(s.clarity || "—")}</td>
-      <td>${fmtPrice(s.price)}</td>
-      <td>${badgeForStatus(s.status)}</td>
+      <td>${fmtPrice(s.total_price)}</td>
+      <td>${badgeForStatus(s.stock_status)}</td>
       <td>
         <div class="row-actions">
           <button class="btn btn-sm" ${locked ? "disabled" : ""} onclick="quickAction('${s.id}', 'hold')">Hold</button>
