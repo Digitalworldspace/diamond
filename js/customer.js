@@ -71,6 +71,28 @@ function setupRealtime() {
   sb.channel("customer-settings")
     .on("postgres_changes", { event: "*", schema: "public", table: "company_settings" }, () => loadCompanySettings())
     .subscribe();
+
+  // If the admin edits or removes this customer's own login (from the Users
+  // tab, another tab, or Table Editor), reflect it live in this open session.
+  sb.channel("customer-own-session")
+    .on("postgres_changes", { event: "*", schema: "public", table: "users" }, (payload) => {
+      const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+      if (!row || row.id !== myProfile.id) return;
+
+      if (payload.eventType === "DELETE" || row.role !== "customer") {
+        showToast("Your access has changed. Please sign in again.", "error");
+        clearSession();
+        setTimeout(() => { window.location.href = "index.html"; }, 1200);
+        return;
+      }
+
+      // Password, name, or email changed on this account — keep the local session in sync.
+      myProfile = row;
+      setSession(row);
+      document.getElementById("custName").textContent = myProfile.full_name || "Customer";
+      document.getElementById("custEmail").textContent = myProfile.email || "";
+    })
+    .subscribe();
 }
 
 async function loadCompanySettings() {
